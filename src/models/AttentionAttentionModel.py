@@ -8,7 +8,6 @@ class AttentionAttentionModel(nn.Module):
     def __init__(self,
                  vocab_size: int,
                  emb_dim: int,
-                 # k_dim: int,
                  max_seq_length: int,
                  attention_heads_per_layer:int):
 
