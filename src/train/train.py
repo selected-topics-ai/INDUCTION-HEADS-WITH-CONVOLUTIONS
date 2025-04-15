@@ -1,6 +1,5 @@
-from typing import Any
-
 import os
+import wandb
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -55,17 +54,28 @@ def train_and_evaluate(epochs: int,
                        save_checkpoints=True,
                        checkpoint_dir="model_checkpoints",
                        device: str = "mps",
-                       checkpoint_freq=1) -> tuple[list[float], list[int], list[float], list[float]]:
+                       checkpoint_freq=1,
+                       use_wandb=False,  # Флаг для использования wandb
+                       project_name="my_project",  # Название проекта в wandb
+                       run_name=None) -> tuple[list[float], list[int], list[float], list[float]]:
 
     train_losses, val_losses = [], []
     train_accuracies, val_accuracies = [], []
 
     model.to(device)
 
+    if use_wandb:
+        wandb.init(project=project_name, name=run_name)
+        wandb.watch(model)
+
     for epoch in range(epochs):
+
         model.train()
         total_loss, correct, total = 0, 0, 0
-        for batch in tqdm(train_loader, desc=f"Epoch {epoch + 1}, Loss: {total_loss:.4f}"):
+
+        progress_bar = tqdm(train_loader, desc=f"Epoch {epoch + 1}", leave=True)
+
+        for i, batch in enumerate(progress_bar):
 
             input_ids = batch["input_ids"].to(device)
             attention_mask = batch["attention_mask"].to(device)
@@ -80,11 +90,27 @@ def train_and_evaluate(epochs: int,
             loss = (loss * attention_mask.view(-1)).sum() / attention_mask.sum()
             loss.backward()
             optimizer.step()
+            scheduler.step()
 
             total_loss += loss.item()
             _, predicted = torch.max(outputs, dim=-1)
             correct += ((predicted == labels) * attention_mask).sum().item()
             total += attention_mask.sum().item()
+
+            avg_train_loss = total_loss / (i + 1)
+            avg_train_accuracy = correct / total
+
+            progress_bar.set_postfix({
+                "Train Loss": f"{avg_train_loss:.4f}",
+                "Train Acc": f"{avg_train_accuracy:.4f}"
+            })
+
+            if use_wandb:
+                wandb.log({
+                    "train_loss_iter": avg_train_loss,
+                    "train_accuracy_iter": avg_train_accuracy,
+                    "epoch": epoch + (i + 1) / len(train_loader)  # Дробное значение эпохи
+                })
 
         train_loss = total_loss / len(train_loader)
         train_accuracy = correct / total
@@ -114,6 +140,15 @@ def train_and_evaluate(epochs: int,
         val_losses.append(val_loss)
         val_accuracies.append(val_accuracy)
 
+        if use_wandb:
+            wandb.log({
+                "train_loss_epoch": train_loss,
+                "train_accuracy": train_accuracy,
+                "val_loss": val_loss,
+                "val_accuracy": val_accuracy,
+                "epoch": epoch + 1
+            })
+
         print(f"Epoch {epoch + 1}: Train Loss = {train_loss:.4f}, Train Acc = {train_accuracy:.4f}, "
               f"Val Loss = {val_loss:.4f}, Val Acc = {val_accuracy:.4f}")
 
@@ -128,23 +163,24 @@ def train_and_evaluate(epochs: int,
                 checkpoint_dir=checkpoint_dir
             )
 
+    if use_wandb:
+        wandb.finish()
+
     return train_losses, val_losses, train_accuracies, val_accuracies
 
 
 if __name__ == "__main__":
 
     tokenizer_name = "gpt2"
-    max_seq_length = 1024
+    max_seq_length = 512
     embedding_dim = 768
     attention_heads_per_layer = 12
     # k_dim = embedding_dim
-    num_proc = 10
-    train_batch_size = 4
+    num_proc = 5
+    train_batch_size = 8
     val_batch_size = 4
-    #train_select_rows = 4
-    train_select_rows = None
-    #val_select_rows = 1000
-    val_select_rows = None
+    train_select_rows = 50_000
+    val_select_rows = 1_000
     epochs = 10
 
     train_dataloader = get_dataloader(tokenizer_name=tokenizer_name,
@@ -198,4 +234,7 @@ if __name__ == "__main__":
         train_loader=train_dataloader,
         val_loader=val_dataloader,
         device=device,
+        use_wandb=True,
+        project_name="INDUCTION-HEADS-WITH-CONVOLUTIONS",
+        run_name="Attention-Attention"
     )
