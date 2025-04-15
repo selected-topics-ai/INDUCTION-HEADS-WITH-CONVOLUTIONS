@@ -51,7 +51,7 @@ class ConvAttentionModel(nn.Module):
         x = self.causal_conv(x)
         x = x.permute(0, 2, 1)
 
-        x, _ = self.attention2(x, x, x)
+        x, _ = self.attention(x, x, x)
 
         logits = x @ self.embedding.weight.T
 
