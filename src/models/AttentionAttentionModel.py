@@ -11,6 +11,8 @@ class AttentionAttentionModel(nn.Module):
                  max_seq_length: int,
                  attention_heads_per_layer:int):
 
+        nn.Transformer
+
         super(AttentionAttentionModel, self).__init__()
         self.emb_dim = emb_dim
 
@@ -39,37 +41,21 @@ class AttentionAttentionModel(nn.Module):
         positions = torch.arange(0, seq_len).unsqueeze(0).repeat(N, 1).to(input_ids.device)
         positional_embeddings = self.position_embedding(positions)
 
-        x = self.embedding(input_ids) + positional_embeddings
-        x = x.permute(1, 0, 2)
+        emb_and_pos = self.embedding(input_ids) + positional_embeddings
+
+        x = emb_and_pos.permute(1, 0, 2)
 
         query = x
         key = query
         value = query
 
-        key_padding_mask = attention_mask == 0
-        causal_mask = torch.triu(torch.ones(seq_len, seq_len) * float('-inf'), diagonal=1)
+        attention_output, _ = self.attention1(query, key, value, is_causal=True)
 
-        expanded_key_padding_mask = key_padding_mask.unsqueeze(1).expand(-1, seq_len, -1)
-        expanded_key_padding_mask = expanded_key_padding_mask.permute(1, 0, 2)
+        x = x + attention_output
 
-        combined_mask = causal_mask.unsqueeze(0) + expanded_key_padding_mask.float()
+        attention_output, _ = self.attention2(x, x, x, is_causal=True)
 
-        # if attention_mask is not None:
-        #     attention_mask = attention_mask.to(dtype=torch.float32)
-        #
-        # N, seq_len = input_ids.shape
-        #
-        # positions = torch.arange(0, seq_len).unsqueeze(0).repeat(N, 1).to(input_ids.device)
-        # positional_embeddings = self.position_embedding(positions)
-        #
-        # x = self.embedding(input_ids) + positional_embeddings
-        #
-        # causal_mask = torch.triu(torch.ones(seq_len, seq_len) * float('-inf'), diagonal=1)
-        #
-        # mask = torch.triu(torch.ones((seq_len, seq_len), dtype=torch.bool), diagonal=1).to(input_ids.device)
-
-        x, _ = self.attention1(query, key, value, attn_mask=combined_mask)
-        x, _ = self.attention2(x, x, x, attn_mask=combined_mask)
+        x = x + attention_output
 
         x = x.permute(1, 0, 2)
 

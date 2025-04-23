@@ -64,6 +64,8 @@ if __name__ == "__main__":
         print("Using Apple Silicon GPU")
         device = "mps"
 
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+
     train_and_evaluate(
         epochs=epochs,
         model=model,
