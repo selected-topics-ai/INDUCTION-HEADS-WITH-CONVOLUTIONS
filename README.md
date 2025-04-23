@@ -1,5 +1,9 @@
 # INDUCTION-HEADS-WITH-CONVOLUTIONS
 
+### Отчет
+
+Отчет находится в `notebooks/report.ipynb`
+
 ### Установка библиотек
 
 Находясь в папке с проектом выполните команды
