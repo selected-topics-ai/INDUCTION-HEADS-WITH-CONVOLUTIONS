@@ -11,30 +11,25 @@ class AttentionAttentionModel(nn.Module):
                  max_seq_length: int,
                  attention_heads_per_layer:int):
 
-        nn.Transformer
-
         super(AttentionAttentionModel, self).__init__()
         self.emb_dim = emb_dim
 
+        self.attention_heads_per_layer = attention_heads_per_layer
+
         self.embedding = nn.Embedding(vocab_size, emb_dim)
-        init.xavier_normal_(self.embedding.weight)
         # Для простоты буду использовать абсолютное позиционирование
         self.position_embedding = nn.Embedding(max_seq_length, emb_dim)
-        init.xavier_normal_(self.position_embedding.weight)
 
-        self.attention1 = nn.MultiheadAttention(emb_dim, num_heads=attention_heads_per_layer)
-        self.attention2 = nn.MultiheadAttention(emb_dim, num_heads=attention_heads_per_layer)
+        self.attention1 = nn.MultiheadAttention(emb_dim,
+                                                num_heads=attention_heads_per_layer,
+                                                dropout=0.1)
+        self.attention2 = nn.MultiheadAttention(emb_dim,
+                                                num_heads=attention_heads_per_layer,
+                                                dropout=0.1)
 
-        for p in self.attention1.parameters():
-            if p.dim() > 1:
-                init.xavier_normal_(p)
+        self.dropout = nn.Dropout(0.1)
 
-        for p in self.attention2.parameters():
-            if p.dim() > 1:
-                init.xavier_normal_(p)
-
-
-    def forward(self, input_ids: torch.Tensor, attention_mask: torch.Tensor = None) -> torch.Tensor:
+    def forward(self, input_ids: torch.Tensor, attention_mask) -> torch.Tensor:
 
         N, seq_len = input_ids.shape
 
@@ -45,15 +40,19 @@ class AttentionAttentionModel(nn.Module):
 
         x = emb_and_pos.permute(1, 0, 2)
 
-        query = x
-        key = query
-        value = query
+        attn_mask = nn.Transformer.generate_square_subsequent_mask(seq_len, input_ids.device)
 
-        attention_output, _ = self.attention1(query, key, value, is_causal=True)
+        attention_output, _ = self.attention1(x, x, x,
+                                              attn_mask=attn_mask,
+                                              key_padding_mask=attention_mask == 1,
+                                              need_weights=False)
 
         x = x + attention_output
 
-        attention_output, _ = self.attention2(x, x, x, is_causal=True)
+        attention_output, _ = self.attention2(x, x, x,
+                                              attn_mask=attn_mask,
+                                              key_padding_mask=attention_mask == 1,
+                                              need_weights=False)
 
         x = x + attention_output
 
@@ -62,3 +61,4 @@ class AttentionAttentionModel(nn.Module):
         logits = x @ self.embedding.weight.T
 
         return logits
+

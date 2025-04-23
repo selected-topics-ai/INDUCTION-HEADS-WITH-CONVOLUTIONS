@@ -21,6 +21,7 @@ def get_dataloader(tokenizer_name: str,
             examples["text"],
             padding="max_length",
             truncation=True,
+            padding_side="right",
             max_length=max_seq_length,
             return_tensors="pt"
         )

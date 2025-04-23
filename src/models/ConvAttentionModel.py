@@ -30,7 +30,7 @@ class ConvAttentionModel(nn.Module):
                                      padding=causal_kernel_size // 2
         )
 
-        self.attention = nn.MultiheadAttention(emb_dim, num_heads=attention_heads_per_layer, batch_first=True)
+        self.attention = nn.MultiheadAttention(emb_dim, num_heads=attention_heads_per_layer)
 
         for p in self.attention.parameters():
             if p.dim() > 1:
@@ -48,10 +48,17 @@ class ConvAttentionModel(nn.Module):
         x = self.embedding(input_ids) + positional_embeddings
 
         x = x.permute(0, 2, 1)
-        x = self.causal_conv(x)
-        x = x.permute(0, 2, 1)
+        attention_output = self.causal_conv(x)
+        x = x + attention_output
 
-        x, _ = self.attention(x, x, x)
+        x = x.permute(0, 2, 1)
+        x = x.permute(1, 0, 2)
+
+        attention_output, _ = self.attention(x, x, x, mask=attention_mask, is_causal=True)
+
+        x = x + attention_output
+        x = x.permute(1, 0, 2)
+
 
         logits = x @ self.embedding.weight.T
 
