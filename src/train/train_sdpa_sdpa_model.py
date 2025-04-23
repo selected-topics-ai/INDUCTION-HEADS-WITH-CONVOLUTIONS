@@ -19,7 +19,7 @@ if __name__ == "__main__":
     num_proc = 5
     train_batch_size = 8
     val_batch_size = 4
-    train_select_rows = 50_000
+    train_select_rows = 60_000
     val_select_rows = 1_000
     epochs = 10
 
@@ -76,5 +76,5 @@ if __name__ == "__main__":
         device=device,
         use_wandb=True,
         project_name="INDUCTION-HEADS-WITH-CONVOLUTIONS",
-        run_name="Attention-Attention"
+        run_name="Attention-Attention-1"
     )
