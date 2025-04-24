@@ -59,7 +59,7 @@ def train_and_evaluate(epochs: int,
     train_accuracies, val_accuracies = [], []
 
     model.to(device)
-    torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+    torch.nn.utils.clip_grad_norm_(model.parameters(), 0.8)
 
     if use_wandb:
         wandb.init(project=project_name, name=run_name)

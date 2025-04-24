@@ -1,6 +1,5 @@
 import torch
 import torch.nn as nn
-import torch.nn.init as init
 
 
 class AttentionAttentionModel(nn.Module):
@@ -21,13 +20,12 @@ class AttentionAttentionModel(nn.Module):
         self.position_embedding = nn.Embedding(max_seq_length, emb_dim)
 
         self.attention1 = nn.MultiheadAttention(emb_dim,
-                                                num_heads=attention_heads_per_layer,
-                                                dropout=0.1)
+                                                num_heads=attention_heads_per_layer)
         self.attention2 = nn.MultiheadAttention(emb_dim,
-                                                num_heads=attention_heads_per_layer,
-                                                dropout=0.1)
+                                                num_heads=attention_heads_per_layer)
 
-        self.dropout = nn.Dropout(0.1)
+        self.head = nn.Linear(emb_dim, vocab_size)
+
 
     def forward(self, input_ids: torch.Tensor, attention_mask) -> torch.Tensor:
 
@@ -44,21 +42,21 @@ class AttentionAttentionModel(nn.Module):
 
         attention_output, _ = self.attention1(x, x, x,
                                               attn_mask=attn_mask,
-                                              key_padding_mask=attention_mask == 1,
+                                              key_padding_mask=attention_mask.to(attn_mask.dtype),
                                               need_weights=False)
 
         x = x + attention_output
 
         attention_output, _ = self.attention2(x, x, x,
                                               attn_mask=attn_mask,
-                                              key_padding_mask=attention_mask == 1,
+                                              key_padding_mask=attention_mask.to(attn_mask.dtype),
                                               need_weights=False)
 
         x = x + attention_output
 
         x = x.permute(1, 0, 2)
 
-        logits = x @ self.embedding.weight.T
+        logits = self.head(x)
 
         return logits
 

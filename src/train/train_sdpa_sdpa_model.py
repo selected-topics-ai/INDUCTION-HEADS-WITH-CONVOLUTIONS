@@ -49,7 +49,7 @@ if __name__ == "__main__":
         max_seq_length=max_seq_length,
     )
 
-    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-3, weight_decay=1e-4)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=3e-4, weight_decay=1e-4)
 
     scheduler = get_cosine_schedule_with_warmup(
         optimizer,

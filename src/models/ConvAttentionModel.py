@@ -17,24 +17,16 @@ class ConvAttentionModel(nn.Module):
         super(ConvAttentionModel, self).__init__()
 
         self.embedding = nn.Embedding(vocab_size, emb_dim)
-        init.xavier_normal_(self.embedding.weight)
-
         self.position_embedding = nn.Embedding(max_seq_length, emb_dim)
-        init.xavier_normal_(self.position_embedding.weight)
 
         # Задача скопировать предыдущий токен, чтобы K была равна Q предыдущего токена
         # Мини-домашка сделать так, чтобы свертка всегда предсказывала 1D
-        self.causal_conv = nn.Conv1d(in_channels=emb_dim,
-                                     out_channels=emb_dim,
-                                     kernel_size=causal_kernel_size,
-                                     padding=causal_kernel_size // 2
-        )
+        self.pad = nn.ConstantPad1d(padding=(causal_kernel_size - 1, 0), value=0)
+        self.causal_conv = nn.Conv1d(emb_dim, emb_dim, causal_kernel_size, padding=0)
 
         self.attention = nn.MultiheadAttention(emb_dim, num_heads=attention_heads_per_layer)
 
-        for p in self.attention.parameters():
-            if p.dim() > 1:
-                init.xavier_normal_(p)
+        self.head = nn.Linear(emb_dim, vocab_size)
 
     def forward(self,
                 input_ids: torch.Tensor,
@@ -48,19 +40,24 @@ class ConvAttentionModel(nn.Module):
         x = self.embedding(input_ids) + positional_embeddings
 
         x = x.permute(0, 2, 1)
-        attention_output = self.causal_conv(x)
+
+        padded_x = self.pad(x)
+        attention_output = self.causal_conv(padded_x)
+
         x = x + attention_output
 
         x = x.permute(0, 2, 1)
         x = x.permute(1, 0, 2)
 
-        attention_output, _ = self.attention(x, x, x, mask=attention_mask, is_causal=True)
+        attn_mask = nn.Transformer.generate_square_subsequent_mask(seq_len, input_ids.device)
+        attention_output, _ = self.attention(x, x, x,
+                                             attn_mask=attn_mask,
+                                             key_padding_mask=attention_mask.to(attn_mask.dtype),
+                                             need_weights=False)
 
         x = x + attention_output
         x = x.permute(1, 0, 2)
 
-
-        logits = x @ self.embedding.weight.T
+        logits = self.head(x)
 
         return logits
-
