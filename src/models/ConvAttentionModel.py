@@ -30,7 +30,7 @@ class ConvAttentionModel(nn.Module):
 
     def forward(self,
                 input_ids: torch.Tensor,
-                attention_mask: Optional[torch.Tensor] = None) -> torch.Tensor:
+                attention_mask: Optional[torch.Tensor] = None) -> tuple[torch.Tensor, torch.Tensor]:
 
         N, seq_len = input_ids.shape
 
@@ -50,14 +50,15 @@ class ConvAttentionModel(nn.Module):
         x = x.permute(1, 0, 2)
 
         attn_mask = nn.Transformer.generate_square_subsequent_mask(seq_len, input_ids.device)
-        attention_output, _ = self.attention(x, x, x,
+        attention_output, attention_weights = self.attention(x, x, x,
                                              attn_mask=attn_mask,
                                              key_padding_mask=attention_mask.to(attn_mask.dtype),
-                                             need_weights=False)
+                                             need_weights=True,
+                                             average_attn_weights=False)
 
         x = x + attention_output
         x = x.permute(1, 0, 2)
 
         logits = self.head(x)
 
-        return logits
+        return logits, attention_weights

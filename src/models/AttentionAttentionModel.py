@@ -27,7 +27,7 @@ class AttentionAttentionModel(nn.Module):
         self.head = nn.Linear(emb_dim, vocab_size)
 
 
-    def forward(self, input_ids: torch.Tensor, attention_mask) -> torch.Tensor:
+    def forward(self, input_ids: torch.Tensor, attention_mask) -> tuple[torch.Tensor, torch.Tensor]:
 
         N, seq_len = input_ids.shape
 
@@ -47,10 +47,11 @@ class AttentionAttentionModel(nn.Module):
 
         x = x + attention_output
 
-        attention_output, _ = self.attention2(x, x, x,
+        attention_output, attention_weights = self.attention2(x, x, x,
                                               attn_mask=attn_mask,
                                               key_padding_mask=attention_mask.to(attn_mask.dtype),
-                                              need_weights=False)
+                                              need_weights=True,
+                                              average_attn_weights=False)
 
         x = x + attention_output
 
@@ -58,5 +59,5 @@ class AttentionAttentionModel(nn.Module):
 
         logits = self.head(x)
 
-        return logits
+        return logits, attention_weights
 
